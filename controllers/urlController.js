@@ -74,6 +74,8 @@ exports.createShortUrl = async (req, res) => {
       expiresAt,
       tags: Array.isArray(tags) ? tags : [],
       createdByIp: getClientIp(req),
+      userId: req.userId || null,
+      guestId: !req.userId && req.guestId ? req.guestId : null,
     });
 
     return res.status(201).json({
@@ -143,6 +145,11 @@ exports.listUrls = async (req, res) => {
     const activeOnly = req.query.active === 'true';
 
     const filter = {};
+    // Scope to the caller's URLs
+    if (req.userId) filter.userId = req.userId;
+    else if (req.guestId) filter.guestId = req.guestId;
+    else return res.status(401).json({ error: 'Authentication required.' });
+
     if (search) filter.$text = { $search: search };
     if (tag) filter.tags = tag;
     if (activeOnly) filter.isActive = true;
@@ -172,7 +179,8 @@ exports.listUrls = async (req, res) => {
 
 exports.getUrl = async (req, res) => {
   try {
-    const urlDoc = await Url.findOne({ shortCode: req.params.shortCode }).lean();
+    const ownerFilter = req.userId ? { userId: req.userId } : { guestId: req.guestId };
+    const urlDoc = await Url.findOne({ shortCode: req.params.shortCode, ...ownerFilter }).lean();
     if (!urlDoc) return res.status(404).json({ error: 'URL not found.' });
 
     return res.json({
@@ -202,13 +210,14 @@ exports.updateUrl = async (req, res) => {
     if (description !== undefined) update.description = description;
     if (tags !== undefined) update.tags = Array.isArray(tags) ? tags : [];
 
+    const ownerFilter = req.userId ? { userId: req.userId } : { guestId: req.guestId };
     const urlDoc = await Url.findOneAndUpdate(
-      { shortCode: req.params.shortCode },
+      { shortCode: req.params.shortCode, ...ownerFilter },
       { $set: update },
       { new: true }
     );
 
-    if (!urlDoc) return res.status(404).json({ error: 'URL not found.' });
+    if (!urlDoc) return res.status(404).json({ error: 'URL not found or not owned by you.' });
 
     return res.json({ success: true, data: urlDoc });
   } catch (err) {
@@ -221,8 +230,9 @@ exports.updateUrl = async (req, res) => {
 
 exports.deleteUrl = async (req, res) => {
   try {
-    const urlDoc = await Url.findOneAndDelete({ shortCode: req.params.shortCode });
-    if (!urlDoc) return res.status(404).json({ error: 'URL not found.' });
+    const ownerFilter = req.userId ? { userId: req.userId } : { guestId: req.guestId };
+    const urlDoc = await Url.findOneAndDelete({ shortCode: req.params.shortCode, ...ownerFilter });
+    if (!urlDoc) return res.status(404).json({ error: 'URL not found or not owned by you.' });
 
     // Also remove all clicks for this URL
     await Click.deleteMany({ urlId: urlDoc._id });

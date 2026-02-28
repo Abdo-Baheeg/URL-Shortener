@@ -54,6 +54,17 @@ const urlSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    userId: {
+      type: require('mongoose').Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    guestId: {
+      type: String,
+      default: null,
+      index: true,
+    },
   },
   {
     timestamps: true,

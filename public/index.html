@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URL Shortener</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* smooth fade for modal */
+    .fade-in  { animation: fadeIn .18s ease; }
+    @keyframes fadeIn { from { opacity:0; transform: scale(.97); } to { opacity:1; transform: scale(1); } }
+    /* spinner */
+    .spin { animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* copiable input */
+    .copy-btn:active { transform: scale(.92); }
+    /* toast slide */
+    #toast { transition: opacity .25s, transform .25s; }
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+  </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 font-sans">
+
+<!-- ─── Toast ──────────────────────────────────────────────────────────── -->
+<div id="toast"
+     class="fixed top-5 right-5 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium opacity-0 pointer-events-none
+            bg-emerald-600 text-white max-w-xs"
+     style="transform:translateY(-8px)">
+</div>
+
+<!-- ─── Auth Modal ─────────────────────────────────────────────────────── -->
+<div id="auth-overlay"
+     class="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+  <div class="fade-in bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-8">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-3 mb-8">
+      <div class="w-9 h-9 bg-violet-600 rounded-xl flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+        </svg>
+      </div>
+      <span class="text-xl font-bold tracking-tight">Shortr</span>
+    </div>
+
+    <!-- Tabs -->
+    <div id="auth-tabs" class="flex gap-1 bg-slate-800 rounded-lg p-1 mb-6">
+      <button onclick="switchTab('login')"    id="tab-login"
+        class="flex-1 py-1.5 text-sm rounded-md font-medium transition-colors tab-btn">Log in</button>
+      <button onclick="switchTab('signup')"   id="tab-signup"
+        class="flex-1 py-1.5 text-sm rounded-md font-medium transition-colors tab-btn">Sign up</button>
+    </div>
+
+    <!-- Login Form -->
+    <form id="form-login" onsubmit="submitLogin(event)" class="space-y-4">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Email</label>
+        <input id="login-email" type="email" required autocomplete="email"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+          placeholder="you@example.com" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Password</label>
+        <input id="login-password" type="password" required autocomplete="current-password"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+          placeholder="••••••••" />
+      </div>
+      <p id="login-error" class="text-red-400 text-xs hidden"></p>
+      <button type="submit"
+        class="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
+        <span id="login-spinner" class="spin hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+        Log in
+      </button>
+    </form>
+
+    <!-- Sign Up Form -->
+    <form id="form-signup" onsubmit="submitSignup(event)" class="space-y-4 hidden">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Name <span class="text-slate-500">(optional)</span></label>
+        <input id="signup-name" type="text" autocomplete="name"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+          placeholder="Your name" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Email</label>
+        <input id="signup-email" type="email" required autocomplete="email"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+          placeholder="you@example.com" />
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Password</label>
+        <input id="signup-password" type="password" required autocomplete="new-password" minlength="6"
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+          placeholder="Min 6 characters" />
+      </div>
+      <p id="signup-error" class="text-red-400 text-xs hidden"></p>
+      <button type="submit"
+        class="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
+        <span id="signup-spinner" class="spin hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+        Create account
+      </button>
+    </form>
+
+    <!-- Divider -->
+    <div class="flex items-center gap-3 my-5">
+      <div class="flex-1 border-t border-slate-700"></div>
+      <span class="text-xs text-slate-500">or</span>
+      <div class="flex-1 border-t border-slate-700"></div>
+    </div>
+
+    <!-- Guest -->
+    <button onclick="continueAsGuest()"
+      class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-medium py-2.5 rounded-lg transition-colors text-sm">
+      Continue as Guest
+    </button>
+    <p class="text-center text-xs text-slate-500 mt-3">
+      Guest links are stored in your browser. Sign up to save them to an account.
+    </p>
+  </div>
+</div>
+
+<!-- ─── Main App ────────────────────────────────────────────────────────── -->
+<div id="app" class="hidden min-h-screen flex flex-col">
+
+  <!-- Nav -->
+  <nav class="sticky top-0 z-30 bg-slate-900/80 backdrop-blur border-b border-slate-800">
+    <div class="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 bg-violet-600 rounded-lg flex items-center justify-center">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+          </svg>
+        </div>
+        <span class="font-bold tracking-tight">Shortr</span>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span id="nav-identity" class="text-sm text-slate-400"></span>
+        <button onclick="logout()"
+          class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg transition-colors">
+          Log out
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <main class="flex-1 max-w-4xl mx-auto w-full px-4 py-10 space-y-8">
+
+    <!-- Shorten Card -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <h2 class="font-semibold text-lg mb-4">Shorten a URL</h2>
+      <form id="shorten-form" onsubmit="shortenUrl(event)" class="space-y-3">
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input id="shorten-url" type="url" required
+            class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+            placeholder="https://your-long-url.com/..." />
+          <button type="button" onclick="toggleAdvanced()"
+            class="text-xs text-slate-400 hover:text-slate-200 transition-colors whitespace-nowrap px-2">
+            Advanced ▸
+          </button>
+        </div>
+
+        <!-- Advanced Options -->
+        <div id="advanced-opts" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input id="shorten-alias" type="text"
+            class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+            placeholder="Custom alias (optional)" />
+          <input id="shorten-title" type="text"
+            class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+            placeholder="Title (optional)" />
+          <input id="shorten-expires" type="text"
+            class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+            placeholder='Expires in: 7d, 24h, 30m …' />
+          <input id="shorten-tags" type="text"
+            class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500"
+            placeholder="Tags (comma-separated)" />
+        </div>
+
+        <p id="shorten-error" class="text-red-400 text-xs hidden"></p>
+
+        <button type="submit"
+          class="w-full sm:w-auto bg-violet-600 hover:bg-violet-500 text-white font-semibold px-6 py-2.5 rounded-xl transition-colors text-sm flex items-center gap-2">
+          <span id="shorten-spinner" class="spin hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></span>
+          Shorten
+        </button>
+      </form>
+
+      <!-- Result -->
+      <div id="shorten-result" class="hidden mt-4 bg-slate-800 border border-violet-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div class="flex-1 min-w-0">
+          <p class="text-xs text-slate-400 mb-0.5">Short URL</p>
+          <a id="result-link" href="#" target="_blank" class="text-violet-400 hover:text-violet-300 font-medium text-sm break-all"></a>
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <button onclick="copyResult()" copy-btn
+            class="copy-btn text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition-colors">
+            Copy
+          </button>
+          <a id="result-qr" href="#" target="_blank"
+            class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition-colors">
+            QR
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- URLs List -->
+    <section>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-lg">My Links</h2>
+        <div class="flex gap-2">
+          <input id="search-input" type="text" placeholder="Search…"
+            class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder-slate-500 w-36"
+            oninput="debouncedSearch()" />
+          <button onclick="loadUrls()" title="Refresh"
+            class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-lg text-xs transition-colors">
+            ↻
+          </button>
+        </div>
+      </div>
+
+      <div id="urls-loading" class="text-center py-10 text-slate-500 text-sm hidden">Loading…</div>
+      <div id="urls-empty"   class="text-center py-10 text-slate-500 text-sm hidden">No links yet. Shorten something above!</div>
+      <div id="urls-list"    class="space-y-3"></div>
+
+      <!-- Pagination -->
+      <div id="pagination" class="hidden flex items-center justify-between mt-6 text-sm text-slate-400">
+        <span id="page-info"></span>
+        <div class="flex gap-2">
+          <button id="btn-prev" onclick="changePage(-1)"
+            class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            ← Prev
+          </button>
+          <button id="btn-next" onclick="changePage(1)"
+            class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            Next →
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ─── Delete Confirm Modal ───────────────────────────────────────────── -->
+<div id="delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 backdrop-blur-sm">
+  <div class="fade-in bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+    <h3 class="font-semibold mb-2">Delete link?</h3>
+    <p class="text-sm text-slate-400 mb-6">This will permanently remove the short URL and all its click data.</p>
+    <div class="flex gap-3 justify-end">
+      <button onclick="closeDeleteModal()"
+        class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm transition-colors">Cancel</button>
+      <button id="delete-confirm-btn" onclick="confirmDelete()"
+        class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+let currentPage = 1;
+let totalPages  = 1;
+let searchQuery = '';
+let deleteTarget = null;
+let searchTimer  = null;
+
+// ─── Auth helpers ────────────────────────────────────────────────────────────
+function getToken()   { return localStorage.getItem('auth_token'); }
+function getGuestId() { return localStorage.getItem('guest_id'); }
+function isLoggedIn() { return !!getToken(); }
+function isGuest()    { return !getToken() && !!getGuestId(); }
+function isAuthenticated() { return isLoggedIn() || isGuest(); }
+
+function getHeaders(extra = {}) {
+  const h = { 'Content-Type': 'application/json', ...extra };
+  if (getToken())   h['Authorization']  = `Bearer ${getToken()}`;
+  if (getGuestId()) h['X-Guest-Id']     = getGuestId();
+  return h;
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+async function init() {
+  if (isAuthenticated()) {
+    showApp();
+  } else {
+    showAuthModal();
+  }
+}
+
+function showApp() {
+  document.getElementById('auth-overlay').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+
+  // Nav identity label
+  const nav = document.getElementById('nav-identity');
+  if (isLoggedIn()) {
+    // Try to fetch user name
+    fetch('/api/auth/me', { headers: getHeaders() })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          const name = d.data.user.name || d.data.user.email;
+          nav.textContent = name;
+        }
+      }).catch(() => {});
+  } else {
+    nav.textContent = '👤 Guest';
+  }
+
+  loadUrls();
+}
+
+function showAuthModal() {
+  document.getElementById('auth-overlay').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+  switchTab('login');
+}
+
+// ─── Tab switching ───────────────────────────────────────────────────────────
+function switchTab(tab) {
+  const isLogin = tab === 'login';
+  document.getElementById('form-login').classList.toggle('hidden', !isLogin);
+  document.getElementById('form-signup').classList.toggle('hidden', isLogin);
+
+  document.getElementById('tab-login').className =
+    `flex-1 py-1.5 text-sm rounded-md font-medium transition-colors tab-btn ${isLogin ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`;
+  document.getElementById('tab-signup').className =
+    `flex-1 py-1.5 text-sm rounded-md font-medium transition-colors tab-btn ${!isLogin ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`;
+}
+
+// ─── Login ───────────────────────────────────────────────────────────────────
+async function submitLogin(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('login-error');
+  const spinner = document.getElementById('login-spinner');
+  errEl.classList.add('hidden');
+  spinner.classList.remove('hidden');
+
+  try {
+    const body = {
+      email:    document.getElementById('login-email').value.trim(),
+      password: document.getElementById('login-password').value,
+    };
+    // Pass guestId to claim any existing guest URLs
+    if (getGuestId()) body.guestId = getGuestId();
+
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = data.error || 'Login failed.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    localStorage.setItem('auth_token', data.data.token);
+    localStorage.removeItem('guest_id');
+
+    if (data.data.claimedUrls > 0) {
+      showToast(`✓ Logged in. ${data.data.claimedUrls} guest link(s) moved to your account.`);
+    } else {
+      showToast('✓ Logged in successfully.');
+    }
+    showApp();
+  } catch {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.classList.remove('hidden');
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+// ─── Sign Up ─────────────────────────────────────────────────────────────────
+async function submitSignup(e) {
+  e.preventDefault();
+  const errEl  = document.getElementById('signup-error');
+  const spinner = document.getElementById('signup-spinner');
+  errEl.classList.add('hidden');
+  spinner.classList.remove('hidden');
+
+  try {
+    const body = {
+      name:     document.getElementById('signup-name').value.trim(),
+      email:    document.getElementById('signup-email').value.trim(),
+      password: document.getElementById('signup-password').value,
+    };
+    if (getGuestId()) body.guestId = getGuestId();
+
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = data.error || 'Sign up failed.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    localStorage.setItem('auth_token', data.data.token);
+    localStorage.removeItem('guest_id');
+
+    if (data.data.claimedUrls > 0) {
+      showToast(`✓ Account created! ${data.data.claimedUrls} guest link(s) moved to your account.`);
+    } else {
+      showToast('✓ Account created!');
+    }
+    showApp();
+  } catch {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.classList.remove('hidden');
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+// ─── Guest ────────────────────────────────────────────────────────────────────
+function continueAsGuest() {
+  if (!getGuestId()) {
+    const id = crypto.randomUUID();
+    localStorage.setItem('guest_id', id);
+  }
+  showToast('Continuing as guest. Your links are saved in this browser.');
+  showApp();
+}
+
+// ─── Logout ───────────────────────────────────────────────────────────────────
+function logout() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('guest_id');
+  showToast('Logged out.');
+  showAuthModal();
+}
+
+// ─── Shorten URL ─────────────────────────────────────────────────────────────
+async function shortenUrl(e) {
+  e.preventDefault();
+  const errEl   = document.getElementById('shorten-error');
+  const spinner = document.getElementById('shorten-spinner');
+  const result  = document.getElementById('shorten-result');
+  errEl.classList.add('hidden');
+  result.classList.add('hidden');
+  spinner.classList.remove('hidden');
+
+  try {
+    const body = { url: document.getElementById('shorten-url').value.trim() };
+    const alias   = document.getElementById('shorten-alias')?.value.trim();
+    const title   = document.getElementById('shorten-title')?.value.trim();
+    const expires = document.getElementById('shorten-expires')?.value.trim();
+    const tags    = document.getElementById('shorten-tags')?.value.trim();
+
+    if (alias)   body.customAlias = alias;
+    if (title)   body.title = title;
+    if (expires) body.expiresIn = expires;
+    if (tags)    body.tags = tags.split(',').map(t => t.trim()).filter(Boolean);
+
+    const res  = await fetch('/api/shorten', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = data.error || 'Failed to shorten URL.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    const shortUrl = data.data.shortUrl;
+    document.getElementById('result-link').href        = shortUrl;
+    document.getElementById('result-link').textContent = shortUrl;
+    document.getElementById('result-qr').href          = `/api/qr/${data.data.shortCode}`;
+    result.classList.remove('hidden');
+
+    // Reset form
+    document.getElementById('shorten-form').reset();
+    document.getElementById('advanced-opts').classList.add('hidden');
+
+    showToast('✓ Short link created!');
+    loadUrls();
+  } catch {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.classList.remove('hidden');
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+function copyResult() {
+  const url = document.getElementById('result-link').textContent;
+  copyToClipboard(url);
+}
+
+function toggleAdvanced() {
+  const el = document.getElementById('advanced-opts');
+  el.classList.toggle('hidden');
+}
+
+// ─── Load URLs ────────────────────────────────────────────────────────────────
+async function loadUrls(page = currentPage) {
+  currentPage = page;
+  const loading = document.getElementById('urls-loading');
+  const empty   = document.getElementById('urls-empty');
+  const list    = document.getElementById('urls-list');
+  const pag     = document.getElementById('pagination');
+
+  loading.classList.remove('hidden');
+  empty.classList.add('hidden');
+  list.innerHTML = '';
+  pag.classList.add('hidden');
+
+  try {
+    const params = new URLSearchParams({ page, limit: 10 });
+    if (searchQuery) params.set('search', searchQuery);
+
+    const res  = await fetch(`/api/urls?${params}`, { headers: getHeaders() });
+    const data = await res.json();
+
+    loading.classList.add('hidden');
+
+    if (!res.ok) {
+      empty.textContent = data.error || 'Failed to load links.';
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    const urls = data.data;
+    totalPages = data.pagination.totalPages;
+
+    if (!urls.length) {
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    list.innerHTML = urls.map(renderUrlCard).join('');
+
+    // Pagination
+    if (data.pagination.totalPages > 1) {
+      document.getElementById('page-info').textContent =
+        `Page ${data.pagination.page} of ${data.pagination.totalPages} · ${data.pagination.total} links`;
+      document.getElementById('btn-prev').disabled = page <= 1;
+      document.getElementById('btn-next').disabled = page >= totalPages;
+      pag.classList.remove('hidden');
+      pag.classList.add('flex');
+    }
+  } catch {
+    loading.classList.add('hidden');
+    empty.textContent = 'Network error.';
+    empty.classList.remove('hidden');
+  }
+}
+
+function renderUrlCard(u) {
+  const shortUrl = u.shortUrl || buildLocalShortUrl(u.shortCode);
+  const created  = new Date(u.createdAt).toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+  const expires  = u.expiresAt
+    ? `Expires ${new Date(u.expiresAt).toLocaleDateString(undefined, { month:'short', day:'numeric' })}`
+    : '';
+  const statusBadge = u.isActive
+    ? '<span class="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs rounded">Active</span>'
+    : '<span class="px-1.5 py-0.5 bg-red-500/10 text-red-400 text-xs rounded">Inactive</span>';
+  const expiredBadge = u.isExpired
+    ? '<span class="px-1.5 py-0.5 bg-amber-500/10 text-amber-400 text-xs rounded">Expired</span>'
+    : '';
+
+  return `
+  <div class="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 transition-colors">
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          ${statusBadge}${expiredBadge}
+          <span class="text-xs text-slate-500">${created}</span>
+          ${expires ? `<span class="text-xs text-slate-500">· ${expires}</span>` : ''}
+          ${u.tags?.length ? `<span class="text-xs text-slate-500">· ${u.tags.join(', ')}</span>` : ''}
+        </div>
+        ${u.title ? `<p class="text-sm font-medium mb-0.5">${esc(u.title)}</p>` : ''}
+        <a href="${shortUrl}" target="_blank" class="text-violet-400 hover:text-violet-300 text-sm font-medium break-all">${shortUrl}</a>
+        <p class="text-xs text-slate-500 mt-1 truncate">${esc(u.originalUrl)}</p>
+      </div>
+      <div class="flex flex-col items-end gap-2 shrink-0">
+        <span class="text-slate-300 text-sm font-semibold">${u.clickCount ?? 0} <span class="text-slate-500 font-normal text-xs">clicks</span></span>
+        <div class="flex gap-1">
+          <button onclick="copyToClipboard('${shortUrl}')"
+            class="copy-btn text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg transition-colors">Copy</button>
+          <a href="/api/qr/${u.shortCode}" target="_blank"
+            class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg transition-colors">QR</a>
+          <button onclick="toggleActive('${u.shortCode}', ${!u.isActive})"
+            class="text-xs bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-lg transition-colors"
+            title="${u.isActive ? 'Deactivate' : 'Activate'}">${u.isActive ? '⏸' : '▶'}</button>
+          <button onclick="openDeleteModal('${u.shortCode}')"
+            class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 px-2.5 py-1 rounded-lg transition-colors">✕</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildLocalShortUrl(code) {
+  return `${location.origin}/${code}`;
+}
+
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Toggle Active ────────────────────────────────────────────────────────────
+async function toggleActive(shortCode, newState) {
+  try {
+    const res = await fetch(`/api/urls/${shortCode}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ isActive: newState }),
+    });
+    if (res.ok) {
+      showToast(newState ? '✓ Link activated.' : '✓ Link deactivated.');
+      loadUrls();
+    }
+  } catch {}
+}
+
+// ─── Delete ────────────────────────────────────────────────────────────────────
+function openDeleteModal(shortCode) {
+  deleteTarget = shortCode;
+  const modal = document.getElementById('delete-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+function closeDeleteModal() {
+  deleteTarget = null;
+  const modal = document.getElementById('delete-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+async function confirmDelete() {
+  if (!deleteTarget) return;
+  const btn = document.getElementById('delete-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    const res = await fetch(`/api/urls/${deleteTarget}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (res.ok) {
+      showToast('✓ Link deleted.');
+      closeDeleteModal();
+      loadUrls();
+    } else {
+      const d = await res.json();
+      showToast(d.error || 'Delete failed.', true);
+      closeDeleteModal();
+    }
+  } catch {
+    showToast('Network error.', true);
+    closeDeleteModal();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Delete';
+  }
+}
+
+// ─── Pagination ────────────────────────────────────────────────────────────────
+function changePage(delta) {
+  const next = currentPage + delta;
+  if (next < 1 || next > totalPages) return;
+  loadUrls(next);
+}
+
+// ─── Search ────────────────────────────────────────────────────────────────────
+function debouncedSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchQuery = document.getElementById('search-input').value.trim();
+    loadUrls(1);
+  }, 400);
+}
+
+// ─── Clipboard ────────────────────────────────────────────────────────────────
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('✓ Copied to clipboard!'))
+    .catch(() => showToast('Could not copy.', true));
+}
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, isError = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = `fixed top-5 right-5 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium max-w-xs
+    ${isError ? 'bg-red-600' : 'bg-emerald-600'} text-white`;
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateY(0)';
+  toast.style.pointerEvents = 'auto';
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-8px)';
+    toast.style.pointerEvents = 'none';
+  }, 3000);
+}
+
+// ─── Close delete modal on overlay click ─────────────────────────────────────
+document.getElementById('delete-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDeleteModal();
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

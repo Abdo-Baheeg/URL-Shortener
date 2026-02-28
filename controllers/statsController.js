@@ -109,7 +109,8 @@ exports.getUrlStats = async (req, res) => {
     const days = Math.min(365, Math.max(1, parseInt(req.query.days) || 30));
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const urlDoc = await Url.findOne({ shortCode }).lean();
+    const ownerFilter = req.userId ? { userId: req.userId } : { guestId: req.guestId };
+    const urlDoc = await Url.findOne({ shortCode, ...ownerFilter }).lean();
     if (!urlDoc) return res.status(404).json({ error: 'URL not found.' });
 
     const baseMatch = { shortCode };
@@ -222,7 +223,8 @@ exports.getClickLogs = async (req, res) => {
     const skip = (page - 1) * limit;
     const { shortCode } = req.params;
 
-    const urlDoc = await Url.findOne({ shortCode }).select('_id shortCode').lean();
+    const ownerFilter = req.userId ? { userId: req.userId } : { guestId: req.guestId };
+    const urlDoc = await Url.findOne({ shortCode, ...ownerFilter }).select('_id shortCode').lean();
     if (!urlDoc) return res.status(404).json({ error: 'URL not found.' });
 
     const filter = { shortCode };

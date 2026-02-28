@@ -13,6 +13,7 @@ const mongoSanitize = require('express-mongo-sanitize');
 const connectDB = require('./config/database');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const apiRouter = require('./routes/api');
+const authRouter = require('./routes/auth');
 const redirectRouter = require('./routes/redirect');
 
 // ── Connect to MongoDB ──────────────────────────────────────────────────────
@@ -31,7 +32,7 @@ app.use(
       ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
       : '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-API-Key', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'X-API-Key', 'Authorization', 'X-Guest-Id'],
   })
 );
 app.use(compression());
@@ -45,6 +46,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(generalLimiter);
 
 // ── Routes ─────────────────────────────────────────────────────────────────
+// Auth routes: /api/auth/...
+app.use('/api/auth', authRouter);
+
 // API routes: /api/...
 app.use('/api', apiRouter);
 
