@@ -1,0 +1,370 @@
+{
+  "info": {
+    "name": "URL Shortener API",
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "description": "Advanced personal URL shortener — shorten links, manage them, and view detailed tracking analytics.\n\n**Setup:**\n1. Set the `baseUrl` variable to your deployment URL (default: `http://localhost:3000`).\n2. Set the `apiKey` variable to your `API_KEY` env value.\n\n**Auth:** protected endpoints require the `X-API-Key` header (pre-configured via collection variable).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Base URL of your deployed app"
+    },
+    {
+      "key": "apiKey",
+      "value": "your_api_key_here",
+      "type": "string",
+      "description": "Value of the API_KEY environment variable"
+    },
+    {
+      "key": "shortCode",
+      "value": "",
+      "type": "string",
+      "description": "Auto-populated by the Create Short URL request"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": { "type": "text/javascript", "exec": [""] }
+    }
+  ],
+  "item": [
+    {
+      "name": "Public",
+      "description": "Endpoints that require no authentication.",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Returns server status and current UTC timestamp."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"ok\",\n  \"timestamp\": \"2026-02-28T12:00:00.000Z\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Shorten URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('shortCode', json.data.shortCode);",
+                  "  console.log('shortCode saved:', json.data.shortCode);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://www.example.com/some/very/long/url/that/needs/shortening\",\n  \"customAlias\": \"\",\n  \"expiresIn\": \"30d\",\n  \"title\": \"Example Page\",\n  \"description\": \"A short description of the link\",\n  \"tags\": [\"demo\", \"example\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shorten",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shorten"]
+            },
+            "description": "Creates a new short URL. On success the `shortCode` collection variable is automatically set for use in subsequent requests.\n\n**Body fields:**\n- `url` *(required)* — the original URL to shorten\n- `customAlias` *(optional)* — 3–30 char custom slug (letters, numbers, `-`, `_`)\n- `expiresIn` *(optional)* — duration string: `7d`, `24h`, `30m`, `60s`\n- `title` / `description` *(optional)* — metadata\n- `tags` *(optional)* — string array"
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n    \"shortCode\": \"aB3xY7z\",\n    \"shortUrl\": \"http://localhost:3000/aB3xY7z\",\n    \"originalUrl\": \"https://www.example.com/some/very/long/url\",\n    \"title\": \"Example Page\",\n    \"description\": \"A short description\",\n    \"tags\": [\"demo\", \"example\"],\n    \"expiresAt\": \"2026-03-29T12:00:00.000Z\",\n    \"createdAt\": \"2026-02-28T12:00:00.000Z\"\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "409 Alias Already Taken",
+              "status": "Conflict",
+              "code": 409,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Custom alias is already in use.\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Redirect (visit short URL)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{shortCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{shortCode}}"]
+            },
+            "description": "Visiting a short URL triggers a 301 redirect to the original URL and logs the click. Disable 'Follow Redirects' in Postman settings to observe the redirect response directly."
+          },
+          "response": [
+            {
+              "name": "301 Redirect",
+              "status": "Moved Permanently",
+              "code": 301,
+              "header": [{ "key": "Location", "value": "https://www.example.com/..." }],
+              "body": "",
+              "_postman_previewlanguage": "text"
+            }
+          ]
+        },
+        {
+          "name": "Get QR Code (PNG)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/qr/{{shortCode}}?format=png",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "qr", "{{shortCode}}"],
+              "query": [{ "key": "format", "value": "png", "description": "png (default) or svg" }]
+            },
+            "description": "Returns a QR code image for the short URL. Use `format=svg` for an SVG response."
+          },
+          "response": []
+        },
+        {
+          "name": "Get QR Code (SVG)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/qr/{{shortCode}}?format=svg",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "qr", "{{shortCode}}"],
+              "query": [{ "key": "format", "value": "svg" }]
+            },
+            "description": "Returns an SVG QR code."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "URL Management",
+      "description": "Protected endpoints for managing shortened URLs. All requests require the `X-API-Key` header.",
+      "item": [
+        {
+          "name": "List All URLs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/urls?page=1&limit=20&active=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "urls"],
+              "query": [
+                { "key": "page",   "value": "1",    "description": "Page number (default 1)" },
+                { "key": "limit",  "value": "20",   "description": "Items per page, max 100 (default 20)" },
+                { "key": "active", "value": "true", "description": "Filter to active URLs only (true/false)" },
+                { "key": "search", "value": "",     "description": "Full-text search across URL, title, and tags", "disabled": true },
+                { "key": "tag",    "value": "",     "description": "Filter by tag", "disabled": true }
+              ]
+            },
+            "description": "Returns a paginated list of all shortened URLs. Supports full-text search and tag filtering."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"shortCode\": \"aB3xY7z\",\n      \"shortUrl\": \"http://localhost:3000/aB3xY7z\",\n      \"originalUrl\": \"https://www.example.com/long/url\",\n      \"title\": \"Example Page\",\n      \"isActive\": true,\n      \"clickCount\": 42,\n      \"expiresAt\": null,\n      \"createdAt\": \"2026-02-28T12:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"total\": 1,\n    \"page\": 1,\n    \"limit\": 20,\n    \"totalPages\": 1\n  }\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Single URL",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/urls/{{shortCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "urls", "{{shortCode}}"]
+            },
+            "description": "Returns all stored metadata for a single shortened URL by its short code."
+          },
+          "response": []
+        },
+        {
+          "name": "Update URL",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"originalUrl\": \"https://www.updated-destination.com\",\n  \"isActive\": true,\n  \"title\": \"Updated Title\",\n  \"description\": \"Updated description\",\n  \"tags\": [\"updated\"],\n  \"expiresAt\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/urls/{{shortCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "urls", "{{shortCode}}"]
+            },
+            "description": "Update any field of an existing short URL. All fields are optional — only send what you want to change.\n\n- Set `isActive: false` to disable/deactivate a link without deleting it.\n- Set `expiresAt: null` to remove expiry."
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate URL",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/urls/{{shortCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "urls", "{{shortCode}}"]
+            },
+            "description": "Quick helper to disable a short URL without deleting it. Returns 410 to visitors."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete URL",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/urls/{{shortCode}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "urls", "{{shortCode}}"]
+            },
+            "description": "Permanently deletes the short URL **and all associated click logs**."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"URL and its click logs deleted.\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Analytics & Stats",
+      "description": "Protected analytics endpoints. Pass `?days=N` (1–365, default 30) to control the reporting window.",
+      "item": [
+        {
+          "name": "Dashboard Overview",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats?days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats"],
+              "query": [{ "key": "days", "value": "30", "description": "Reporting window in days (1–365)" }]
+            },
+            "description": "Aggregate stats across **all** shortened URLs:\n- Summary (totalUrls, activeUrls, totalClicks, recentClicks)\n- Top 10 URLs by click count\n- Clicks per day (filled series)\n- Top countries, browsers, device types, referrers"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"summary\": {\n      \"totalUrls\": 15,\n      \"activeUrls\": 12,\n      \"totalClicks\": 1042,\n      \"recentClicks\": 280,\n      \"periodDays\": 30\n    },\n    \"topUrls\": [...],\n    \"clicksByDay\": [{\"date\": \"2026-02-01\", \"count\": 12}, ...],\n    \"topCountries\": [{\"country\": \"Egypt\", \"count\": 320}, ...],\n    \"topBrowsers\": [{\"browser\": \"Chrome\", \"count\": 610}, ...],\n    \"topDevices\": [{\"deviceType\": \"mobile\", \"count\": 540}, ...],\n    \"topReferrers\": [{\"referrer\": \"twitter.com\", \"count\": 95}, ...]\n  }\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Per-URL Analytics",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/{{shortCode}}?days=30",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "{{shortCode}}"],
+              "query": [{ "key": "days", "value": "30" }]
+            },
+            "description": "Deep analytics for a single short URL:\n- Total clicks and unique visitors\n- Clicks per day (filled series) and clicks by hour-of-day\n- Breakdown by country, browser, OS, device type, referrer\n- 50 most recent raw click records"
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"url\": {\n      \"shortCode\": \"aB3xY7z\",\n      \"originalUrl\": \"https://www.example.com/long/url\",\n      \"title\": \"Example Page\",\n      \"isActive\": true,\n      \"expiresAt\": null,\n      \"createdAt\": \"2026-02-28T12:00:00.000Z\"\n    },\n    \"summary\": {\n      \"totalClicks\": 42,\n      \"uniqueVisitors\": 28,\n      \"periodDays\": 30\n    },\n    \"clicksByDay\": [{\"date\": \"2026-02-01\", \"count\": 3}, ...],\n    \"clicksByHour\": [{\"hour\": 0, \"count\": 1}, ...],\n    \"topCountries\": [{\"country\": \"Egypt\", \"count\": 20}, ...],\n    \"topBrowsers\": [...],\n    \"topOs\": [...],\n    \"topDevices\": [...],\n    \"topReferrers\": [...],\n    \"recentClicks\": [...]\n  }\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Raw Click Logs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/{{shortCode}}/logs?page=1&limit=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "{{shortCode}}", "logs"],
+              "query": [
+                { "key": "page",       "value": "1",        "description": "Page number" },
+                { "key": "limit",      "value": "50",       "description": "Rows per page, max 200" },
+                { "key": "country",    "value": "",         "description": "Filter by country name", "disabled": true },
+                { "key": "browser",    "value": "",         "description": "Filter by browser name", "disabled": true },
+                { "key": "deviceType", "value": "",         "description": "Filter by device type (desktop/mobile/tablet/bot)", "disabled": true }
+              ]
+            },
+            "description": "Paginated raw click log for a single URL. Each record includes IP, browser, OS, device, country, city, referrer, language, and timestamp."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"_id\": \"...\",\n      \"ip\": \"41.x.x.x\",\n      \"browser\": \"Chrome\",\n      \"browserVersion\": \"121.0\",\n      \"os\": \"Windows\",\n      \"osVersion\": \"10\",\n      \"deviceType\": \"desktop\",\n      \"country\": \"Egypt\",\n      \"city\": \"Cairo\",\n      \"referrerDomain\": \"twitter.com\",\n      \"language\": \"ar\",\n      \"createdAt\": \"2026-02-28T14:30:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"total\": 42,\n    \"page\": 1,\n    \"limit\": 50,\n    \"totalPages\": 1\n  }\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
