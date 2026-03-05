@@ -25,7 +25,22 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ── Security & utility middleware ──────────────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
+        styleSrc:  ["'self'", "'unsafe-inline'"],
+        imgSrc:    ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'"],
+        fontSrc:   ["'self'"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+  })
+);
 app.use(
   cors({
     origin: process.env.ALLOWED_ORIGINS

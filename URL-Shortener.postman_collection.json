@@ -2,7 +2,7 @@
   "info": {
     "name": "URL Shortener API",
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "description": "Advanced personal URL shortener — shorten links, manage them, and view detailed tracking analytics.\n\n**Setup:**\n1. Set the `baseUrl` variable to your deployment URL (default: `http://localhost:3000`).\n2. Set the `apiKey` variable to your `API_KEY` env value.\n\n**Auth:** protected endpoints require the `X-API-Key` header (pre-configured via collection variable).",
+    "description": "Advanced personal URL shortener — shorten links, manage them, and view detailed tracking analytics.\n\n**Setup:**\n1. Set the `baseUrl` collection variable to your deployment URL (default: `http://localhost:3000`).\n2. Run **Sign Up** or **Log In** — the `authToken` variable is saved automatically.\n3. *(Optional)* Run **Continue as Guest** to populate `guestId` instead.\n\n**Auth:** protected endpoints send `Authorization: Bearer {{authToken}}` (logged-in users) or `X-Guest-Id: {{guestId}}` (guests). Both are pre-configured via collection variables.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,16 +13,22 @@
       "description": "Base URL of your deployed app"
     },
     {
-      "key": "apiKey",
-      "value": "your_api_key_here",
+      "key": "authToken",
+      "value": "",
       "type": "string",
-      "description": "Value of the API_KEY environment variable"
+      "description": "JWT – auto-populated by Sign Up / Log In requests"
+    },
+    {
+      "key": "guestId",
+      "value": "",
+      "type": "string",
+      "description": "UUID for guest users – auto-populated by Continue as Guest"
     },
     {
       "key": "shortCode",
       "value": "",
       "type": "string",
-      "description": "Auto-populated by the Create Short URL request"
+      "description": "Auto-populated by the Shorten URL request"
     }
   ],
   "event": [
@@ -32,6 +38,212 @@
     }
   ],
   "item": [
+    {
+      "name": "User Auth",
+      "description": "Account signup, login, and guest mode.\n\n- **Sign Up / Log In** → saves `authToken` automatically.\n- **Continue as Guest** → generates a UUID and saves it as `guestId`.\n- When you later Sign Up or Log In with a `guestId` in the body, all guest links are automatically migrated to the new account.",
+      "item": [
+        {
+          "name": "Sign Up",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('authToken', json.data.token);",
+                  "  pm.collectionVariables.set('guestId', '');",
+                  "  console.log('authToken saved:', json.data.token);",
+                  "  if (json.data.claimedUrls > 0) {",
+                  "    console.log('Guest URLs migrated:', json.data.claimedUrls);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alice Smith\",\n  \"email\": \"alice@example.com\",\n  \"password\": \"secret123\",\n  \"guestId\": \"{{guestId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "signup"]
+            },
+            "description": "Create a new user account.\n\n**Body fields:**\n- `email` *(required)*\n- `password` *(required, min 6 chars)*\n- `name` *(optional)*\n- `guestId` *(optional)* — pass the current guest UUID to migrate all guest links to this account\n\nOn success, `authToken` is saved automatically as a collection variable."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"user\": {\n      \"_id\": \"66f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"Alice Smith\",\n      \"email\": \"alice@example.com\",\n      \"createdAt\": \"2026-03-01T10:00:00.000Z\"\n    },\n    \"claimedUrls\": 3\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "409 Email Already Registered",
+              "status": "Conflict",
+              "code": 409,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Email already in use.\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "400 Validation Error",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Password must be at least 6 characters.\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Log In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('authToken', json.data.token);",
+                  "  pm.collectionVariables.set('guestId', '');",
+                  "  console.log('authToken saved:', json.data.token);",
+                  "  if (json.data.claimedUrls > 0) {",
+                  "    console.log('Guest URLs migrated:', json.data.claimedUrls);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@example.com\",\n  \"password\": \"secret123\",\n  \"guestId\": \"{{guestId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticate with email and password.\n\nInclude `guestId` in the body to migrate any links created as a guest into this account.\n\nOn success, `authToken` is saved automatically as a collection variable."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"user\": {\n      \"_id\": \"66f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"Alice Smith\",\n      \"email\": \"alice@example.com\"\n    },\n    \"claimedUrls\": 0\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Invalid Credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Invalid email or password.\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Current User (me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Returns the profile of the currently authenticated user. Requires a valid JWT (`authToken`)."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"user\": {\n      \"_id\": \"66f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"Alice Smith\",\n      \"email\": \"alice@example.com\",\n      \"createdAt\": \"2026-03-01T10:00:00.000Z\",\n      \"updatedAt\": \"2026-03-01T10:00:00.000Z\"\n    }\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 No / Invalid Token",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Login required.\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Continue as Guest (pre-request helper)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generates a UUID v4 and stores it so guest requests include X-Guest-Id.",
+                  "function uuidv4() {",
+                  "  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {",
+                  "    const r = Math.random() * 16 | 0;",
+                  "    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);",
+                  "  });",
+                  "}",
+                  "if (!pm.collectionVariables.get('guestId')) {",
+                  "  const id = uuidv4();",
+                  "  pm.collectionVariables.set('guestId', id);",
+                  "  console.log('Guest ID created:', id);",
+                  "} else {",
+                  "  console.log('Existing guest ID:', pm.collectionVariables.get('guestId'));",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Guest ID is set', function() {",
+                  "  pm.expect(pm.collectionVariables.get('guestId')).to.match(",
+                  "    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+                  "  );",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Run this request to generate a guest UUID and save it as the `guestId` collection variable. After running it, all URL Management and Analytics requests will automatically include the `X-Guest-Id` header.\n\nThe pre-request script generates the UUID; it hits `/api/health` as a simple no-op target."
+          },
+          "response": []
+        }
+      ]
+    },
     {
       "name": "Public",
       "description": "Endpoints that require no authentication.",
@@ -167,13 +379,16 @@
     },
     {
       "name": "URL Management",
-      "description": "Protected endpoints for managing shortened URLs. All requests require the `X-API-Key` header.",
+      "description": "Protected endpoints for managing your shortened URLs.\n\n**Auth (send one):**\n- Logged-in user → `Authorization: Bearer {{authToken}}`\n- Guest → `X-Guest-Id: {{guestId}}`\n\nEach caller only sees and can modify their own links.",
       "item": [
         {
           "name": "List All URLs",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}", "description": "Use this for logged-in users" },
+              { "key": "X-Guest-Id",    "value": "{{guestId}}",          "description": "Use this for guest users", "disabled": true }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/urls?page=1&limit=20&active=true",
               "host": ["{{baseUrl}}"],
@@ -203,7 +418,10 @@
           "name": "Get Single URL",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "X-Guest-Id",    "value": "{{guestId}}",          "disabled": true }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/urls/{{shortCode}}",
               "host": ["{{baseUrl}}"],
@@ -218,8 +436,9 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "X-API-Key", "value": "{{apiKey}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "X-Guest-Id",    "value": "{{guestId}}",          "disabled": true },
+              { "key": "Content-Type",  "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -240,8 +459,9 @@
           "request": {
             "method": "PUT",
             "header": [
-              { "key": "X-API-Key", "value": "{{apiKey}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "X-Guest-Id",    "value": "{{guestId}}",          "disabled": true },
+              { "key": "Content-Type",  "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -261,7 +481,10 @@
           "name": "Delete URL",
           "request": {
             "method": "DELETE",
-            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "X-Guest-Id",    "value": "{{guestId}}",          "disabled": true }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/urls/{{shortCode}}",
               "host": ["{{baseUrl}}"],
@@ -284,13 +507,13 @@
     },
     {
       "name": "Analytics & Stats",
-      "description": "Protected analytics endpoints. Pass `?days=N` (1–365, default 30) to control the reporting window.",
+      "description": "Protected analytics endpoints. Pass `?days=N` (1–365, default 30) to control the reporting window.\n\n**Note:** Dashboard Overview requires a logged-in JWT user. Per-URL stats and logs work for both logged-in users and guests (owner-scoped).",
       "item": [
         {
           "name": "Dashboard Overview",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
             "url": {
               "raw": "{{baseUrl}}/api/stats?days=30",
               "host": ["{{baseUrl}}"],
@@ -314,7 +537,10 @@
           "name": "Per-URL Analytics",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "X-Guest-Id",    "value": "{{guestId}}",          "disabled": true }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/stats/{{shortCode}}?days=30",
               "host": ["{{baseUrl}}"],
@@ -338,7 +564,10 @@
           "name": "Raw Click Logs",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-API-Key", "value": "{{apiKey}}" }],
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "X-Guest-Id",    "value": "{{guestId}}",          "disabled": true }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/stats/{{shortCode}}/logs?page=1&limit=50",
               "host": ["{{baseUrl}}"],
